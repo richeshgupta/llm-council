@@ -1,0 +1,51 @@
+{
+  "defaults": {
+    "stage_timeout_seconds": 240,
+    "max_parallel_api_requests": 8,
+    "max_parallel_cli_processes": 2
+  },
+  "advisors": [
+    {
+      "id": "codex-terra-cli",
+      "display_name": "Codex GPT-5.6 Terra",
+      "provider": "codex_cli",
+      "mode": "cli",
+      "enabled": false,
+      "roles": ["council_member", "chairman"],
+      "command": "codex",
+      "model": "gpt-5.6-terra",
+      "timeout_seconds": 240,
+      "options": {
+        "sandbox": "read-only",
+        "approval_policy": "never"
+      }
+    },
+    {
+      "id": "claude-sonnet-cli",
+      "display_name": "Claude Sonnet via Claude Code",
+      "provider": "claude_cli",
+      "mode": "cli",
+      "enabled": false,
+      "roles": ["council_member"],
+      "command": "claude",
+      "model": "sonnet",
+      "timeout_seconds": 180
+    },
+    {
+      "id": "openrouter-gemini",
+      "display_name": "Gemini Pro via OpenRouter",
+      "provider": "openrouter",
+      "mode": "api",
+      "enabled": true,
+      "roles": ["council_member", "chairman"],
+      "model": "google/gemini-3-pro-preview",
+      "env_api_key": "OPENROUTER_API_KEY"
+    }
+  ],
+  "chairman": {
+    "advisor_id": "openrouter-gemini"
+  },
+  "title_generator": {
+    "advisor_id": "openrouter-gemini"
+  }
+}
