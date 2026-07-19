@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Council CLI"
+  short_description: "Install and run the LLM Council from terminal."
+  default_prompt: "Use the LLM Council CLI skill to install dependencies, verify Claude/Codex CLI access, and run a council query from the terminal."

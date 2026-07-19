@@ -12,5 +12,8 @@ dependencies = [
     "pydantic>=2.9.0",
 ]
 
+[project.scripts]
+llm-council = "backend.cli:main"
+
 [tool.setuptools]
 packages = ["backend", "backend.advisors", "backend.advisors.adapters", "backend.orchestration"]

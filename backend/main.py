@@ -1,7 +1,6 @@
 """FastAPI backend for LLM Council."""
 
 from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Any
@@ -14,15 +13,6 @@ from .council import run_full_council, generate_conversation_title, stage1_colle
 from .advisors.registry import AdvisorRegistry
 
 app = FastAPI(title="LLM Council API")
-
-# Enable CORS for local development
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 class CreateConversationRequest(BaseModel):

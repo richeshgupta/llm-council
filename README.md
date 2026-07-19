@@ -1,114 +1,108 @@
-# LLM Council
+# LLM Council CLI
 
-An extensible local LLM Council that can ask multiple advisors for independent answers, collect peer review, and synthesize a final council response.
+Terminal-only LLM Council that asks multiple local/provider advisors for independent answers, collects peer review, and synthesizes a final response.
 
-This implementation is provider-neutral. Advisors can be backed by APIs, local CLIs, or future local inference providers through a common adapter interface.
+Default providers:
 
-## What it does
+- Codex GPT-5.6 Terra through local `codex exec`
+- Claude Sonnet through local `claude -p`
+- OpenRouter adapter available but disabled by default
 
-For each user message, the app runs a three-stage workflow:
+## Install
 
-1. Stage 1: each enabled council advisor answers the prompt independently.
-2. Stage 2: advisors review anonymized Stage 1 answers and rank them.
-3. Stage 3: a configured chairman advisor synthesizes the final answer.
+```bash
+cd /home/richesh/Desktop/projects/llm-council
+/home/richesh/.local/bin/python3.11 -m venv .venv
+.venv/bin/python -m pip install -e .
+```
 
-The UI shows all intermediate artifacts, not just the final answer.
+## Verify providers
 
-## Provider model
+Claude:
 
-Providers are implemented as advisors under:
+```bash
+claude -p - --output-format text --no-session-persistence --tools '' <<'EOF'
+Return exactly: CLAUDE_OK
+EOF
+```
+
+Codex Terra:
+
+```bash
+codex exec --sandbox read-only --cd /home/richesh/Desktop/projects/llm-council --model gpt-5.6-terra - <<'EOF'
+Return exactly: TERRA_OK
+EOF
+```
+
+## Ask a query
+
+```bash
+.venv/bin/python scripts/ask_council.py "Explain Docker in 3 bullet points."
+```
+
+Final answer only:
+
+```bash
+.venv/bin/python scripts/ask_council.py --brief "What is 2 + 2?"
+```
+
+Pipe input:
+
+```bash
+echo "Summarize HTTP in one paragraph." | .venv/bin/python scripts/ask_council.py
+```
+
+## Configuration
+
+Edit:
 
 ```text
-backend/advisors/adapters/
+backend/advisors.json
 ```
 
-Current adapters:
+Current defaults:
 
-- `openrouter.py` — API-backed OpenRouter advisor.
-- `claude_cli.py` — subscription-backed Claude Code CLI advisor.
-- `codex_cli.py` — subscription-backed Codex CLI advisor.
+- `codex-terra-cli`: enabled, council member, chairman, title generator
+- `claude-sonnet-cli`: enabled, council member
+- `openrouter-gemini`: disabled
 
-The council orchestrator calls only the provider-neutral `Advisor` interface. It does not know whether an advisor is API-backed, CLI-backed, or local.
+## Optional API server
 
-## Subscription-backed usage
-
-Claude Pro/Max and Codex Plus/Pro are not API credits. To use those paid subscriptions, configure CLI-backed advisors and authenticate the local tools separately:
+The CLI is the primary interface. The FastAPI server remains available for programmatic use:
 
 ```bash
-claude auth
-codex login
+.venv/bin/python -m backend.main
 ```
 
-Then copy and edit the advisor config:
-
-```bash
-cp backend/advisors.json.example backend/advisors.json
-```
-
-Enable the desired advisors in `backend/advisors.json`.
-
-Codex GPT-5.6 Terra is represented as:
-
-```json
-{
-  "id": "codex-terra-cli",
-  "provider": "codex_cli",
-  "model": "gpt-5.6-terra"
-}
-```
-
-If the local Codex CLI rejects that model slug, the adapter fails clearly instead of silently downgrading.
-
-## API-backed usage
-
-For OpenRouter:
-
-```bash
-OPENROUTER_API_KEY=sk-or-v1-...
-```
-
-If no `backend/advisors.json` is present, the backend falls back to OpenRouter defaults from `backend/config.py`.
-
-## Running
-
-Backend:
-
-```bash
-python -m backend.main
-```
-
-or, if using `uv`:
-
-```bash
-uv run python -m backend.main
-```
-
-Frontend:
-
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Open:
+Useful endpoints:
 
 ```text
-http://localhost:5173
-```
-
-## Advisor endpoints
-
-```http
 GET /api/advisors
 GET /api/advisors/health
+POST /api/conversations
+POST /api/conversations/{conversation_id}/message
 ```
 
-These expose enabled advisor metadata and lightweight health state.
+## Tests
 
-## Design docs
+```bash
+.venv/bin/python -m unittest discover -s tests -p 'test*.py' -v
+```
 
-- `docs/SUBSCRIPTION_BACKED_LLM_COUNCIL_HLD.md`
-- `docs/PROVIDER_INTERFACE_ORCHESTRATOR_PLAN.md`
-- `docs/LLM_COUNCIL_LLD.md`
+## Skill
 
+Repo-local Codex skill:
+
+```text
+.codex/skills/llm-council-cli/SKILL.md
+```
+
+Use it when asking Codex to install, configure, smoke-test, or run this project from terminal.
+
+## Validation
+
+See:
+
+```text
+docs/CLI_VALIDATION_REPORT.md
+```
