@@ -15,13 +15,7 @@ python -m pip install -e .
 Ask a query:
 
 ```bash
-.venv/bin/llm-council "Explain Docker in 3 bullet points."
-```
-
-Compatibility wrapper:
-
-```bash
-.venv/bin/python scripts/ask_council.py "Explain Docker in 3 bullet points."
+.venv/bin/llm-council ask --mode general "Explain Docker in 3 bullet points."
 ```
 
 ## Provider smoke checks
@@ -44,8 +38,8 @@ EOF
 
 ## Architecture
 
-- `backend/cli.py`: installed console entrypoint `llm-council`.
-- `scripts/ask_council.py`: thin compatibility wrapper around `backend.cli`.
+- `backend/cli.py`: small installed entrypoint and command dispatcher.
+- `backend/commands/`: independent ask, doctor, admin, mode, parser, and output modules.
 - `backend/council.py`: compatibility facade over the provider-neutral orchestrator.
 - `backend/orchestration/`: prompt construction, ranking parsing, bounded execution, and stage handoff.
 - `backend/advisors/base.py`: provider-neutral `Advisor` interface.
@@ -87,7 +81,7 @@ Query
 Run a real query:
 
 ```bash
-.venv/bin/llm-council --brief "What is 2 + 2?"
+.venv/bin/llm-council ask --output final "What is 2 + 2?"
 ```
 
 ## Common gotchas

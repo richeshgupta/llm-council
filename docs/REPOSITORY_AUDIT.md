@@ -39,9 +39,10 @@ The primary use cases are architecture brainstorming, design review, tradeoff an
 | Packaging | Installed CLI changed providers outside the repo | Config is packaged and resolved independently of CWD; missing explicit config fails safely |
 | CLI UX | Silent multi-minute runs | Stage progress goes to stderr |
 | CLI UX | Critiques hidden | Full output now includes peer-review text |
+| CLI UX | Behavior accumulated in one large script | Added generic subcommands and split command modules; the installed entrypoint is 23 lines |
 | Automation | Failed runs exited 0 | Defined exit statuses 0/1/2/130 |
 | Automation | No structured output | Added versioned JSON output with run ID and diagnostics |
-| Setup | Health checks had no CLI surface | Added passive `--doctor` and active `--doctor --probe` |
+| Setup | Health checks had no CLI surface | Added passive `doctor` and active `doctor --probe` commands |
 | Reliability | One adapter exception aborted a stage | Exceptions and deadlines are isolated per advisor |
 | Reliability | Provider failures disappeared | Stage-specific failure metadata and stderr warnings are retained |
 | Reliability | Primary chairman had no fallback | Ordered chairman/council-member failover plus degraded best-answer fallback |

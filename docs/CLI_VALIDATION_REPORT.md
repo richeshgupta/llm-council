@@ -14,7 +14,7 @@ Command:
 .venv/bin/python -m unittest discover -s tests -p 'test*.py' -v
 ```
 
-Result: **27 tests passed**.
+Result: **31 tests passed**.
 
 Covered scenarios include:
 
@@ -28,6 +28,7 @@ Covered scenarios include:
 - Configuration loading outside the repository root.
 - Missing config, duplicate advisor IDs, and invalid concurrency.
 - Provider/config mode mismatch validation.
+- Explicit subcommand parsing, generic modes, and legacy command normalization.
 - Complete CLI role rendering for system/user messages.
 - Strict ranking parsing and malformed ballot rejection.
 - Anonymous labels beyond 26 candidates.
@@ -45,14 +46,14 @@ Verified:
 - `backend/advisors.json` and `backend/advisors.json.example` are present in the wheel.
 - Running outside the checkout loads `codex_cli` and `claude_cli`.
 - The CLI does not silently switch to OpenRouter.
-- `llm-council --doctor` resolves the packaged configuration and finds both local commands.
+- `llm-council doctor` resolves the packaged configuration and finds both local commands.
 
 ## Provider authentication
 
 Command:
 
 ```bash
-.venv/bin/llm-council --doctor --probe
+.venv/bin/llm-council doctor --probe
 ```
 
 Result:
@@ -60,6 +61,22 @@ Result:
 - Codex GPT-5.6 Terra: `LLM_COUNCIL_OK`
 - Claude Sonnet via Claude Code: `LLM_COUNCIL_OK`
 - Exit status: `0`
+
+## Command and mode interface
+
+Validated from both the checkout and a clean wheel installation:
+
+```bash
+llm-council modes
+llm-council advisors
+llm-council config path
+llm-council config show
+llm-council config validate
+llm-council doctor --probe
+llm-council ask --mode brainstorm --output final "..."
+```
+
+The real brainstorm-mode run completed through Claude and Codex with two distinct approaches, peer review, and a successful recommendation from the chairman. The legacy direct-query and `--doctor` flag forms remain covered by parser tests.
 
 ## Real council flow
 

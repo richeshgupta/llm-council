@@ -27,13 +27,13 @@ python -m pip install -e .
 Verify the local setup without consuming model usage:
 
 ```bash
-llm-council --doctor
+llm-council doctor
 ```
 
 Verify authentication and model access with a minimal real request to every enabled provider:
 
 ```bash
-llm-council --doctor --probe
+llm-council doctor --probe
 ```
 
 `--probe` may count against provider subscription usage.
@@ -41,7 +41,8 @@ llm-council --doctor --probe
 ## Ask the council
 
 ```bash
-llm-council "Propose three architectures for a webhook delivery system and compare them."
+llm-council ask --mode brainstorm \
+  "Propose three architectures for a webhook delivery system and compare them."
 ```
 
 The default output includes independent answers, full peer critiques, aggregate rankings, and final synthesis. Progress and provider warnings go to stderr, keeping stdout usable in pipelines.
@@ -49,22 +50,35 @@ The default output includes independent answers, full peer critiques, aggregate 
 Final answer only:
 
 ```bash
-llm-council --output final "What are the tradeoffs between REST and gRPC here?"
+llm-council ask --mode decision --output final \
+  "What are the tradeoffs between REST and gRPC here?"
 ```
 
 Structured output:
 
 ```bash
-llm-council --output json "Review this migration plan" > council-result.json
+llm-council ask --mode review --output json \
+  "Review this migration plan" > council-result.json
 ```
 
 Pipe a request:
 
 ```bash
-printf '%s\n' "Brainstorm ways to reduce CI time" | llm-council --output final
+printf '%s\n' "Ways to reduce CI time" | \
+  llm-council ask --mode brainstorm --output final
 ```
 
-The compatibility forms `--brief`, `scripts/ask_council.py`, and `./start.sh` remain available.
+List the generic modes and inspect the active runtime configuration:
+
+```bash
+llm-council modes
+llm-council advisors
+llm-council config path
+llm-council config show
+llm-council config validate
+```
+
+For compatibility, `llm-council "question"`, `--brief`, and the legacy `--doctor` flag still work. New integrations should use explicit commands.
 
 ## Configuration
 
@@ -112,8 +126,8 @@ python -m unittest discover -s tests -p 'test*.py' -v
 Real-provider checks are intentionally separate because they consume subscription usage:
 
 ```bash
-llm-council --doctor --probe
-llm-council --output final "Reply with exactly COUNCIL_OK"
+llm-council doctor --probe
+llm-council ask --output final "Reply with exactly COUNCIL_OK"
 ```
 
 See [docs/CLI_VALIDATION_REPORT.md](docs/CLI_VALIDATION_REPORT.md) for the latest validation results.

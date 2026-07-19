@@ -16,7 +16,7 @@ dependencies = [
 llm-council = "backend.cli:main"
 
 [tool.setuptools]
-packages = ["backend", "backend.advisors", "backend.advisors.adapters", "backend.orchestration"]
+packages = ["backend", "backend.advisors", "backend.advisors.adapters", "backend.commands", "backend.orchestration"]
 
 [tool.setuptools.package-data]
 backend = ["advisors.json", "advisors.json.example"]

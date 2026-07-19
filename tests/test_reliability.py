@@ -22,7 +22,9 @@ from backend.advisors.base import (
 )
 from backend.advisors.config import AdvisorsConfig, load_advisors_config
 from backend.advisors.registry import AdvisorRegistry
-from backend.cli import run_query
+from backend.commands.ask import run_query
+from backend.commands.modes import apply_mode
+from backend.commands.parser import parse_args
 from backend.orchestration.council_orchestrator import CouncilOrchestrator
 from backend.orchestration.executor import run_advisors_parallel
 from backend.orchestration.prompts import build_stage2_prompt
@@ -184,6 +186,29 @@ class PromptAndRankingTests(unittest.TestCase):
         self.assertIn("Response AB", mapping)
         self.assertEqual(len(set(mapping.values())), 28)
 
+    def test_brainstorm_mode_adds_generic_instruction(self):
+        prompt = apply_mode("design a queue", "brainstorm")
+        self.assertIn("COUNCIL MODE: brainstorm", prompt)
+        self.assertIn("design a queue", prompt)
+
+
+class CommandParserTests(unittest.TestCase):
+    def test_explicit_ask_mode(self):
+        args = parse_args(["ask", "--mode", "review", "proposal"])
+        self.assertEqual(args.command, "ask")
+        self.assertEqual(args.mode, "review")
+        self.assertEqual(args.query, ["proposal"])
+
+    def test_legacy_query_maps_to_ask(self):
+        args = parse_args(["--brief", "legacy query"])
+        self.assertEqual(args.command, "ask")
+        self.assertTrue(args.brief)
+
+    def test_legacy_doctor_flag_maps_to_command(self):
+        args = parse_args(["--doctor", "--probe"])
+        self.assertEqual(args.command, "doctor")
+        self.assertTrue(args.probe)
+
 
 class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
     async def test_executor_isolates_adapter_exception(self):
@@ -244,10 +269,19 @@ class ReliabilityTests(unittest.IsolatedAsyncioTestCase):
         registry = ScriptedRegistry([failed], [])
         stdout, stderr = StringIO(), StringIO()
         with redirect_stdout(stdout), redirect_stderr(stderr):
-            code = await run_query("question", registry, output="json", show_progress=False)
+            code = await run_query(
+                "question",
+                registry,
+                mode="review",
+                output="json",
+                show_progress=False,
+            )
         payload = json.loads(stdout.getvalue())
         self.assertEqual(code, 1)
+        self.assertEqual(payload["mode"], "review")
+        self.assertEqual(payload["query"], "question")
         self.assertEqual(payload["stage3"]["status"], "failed")
+        self.assertIn("COUNCIL MODE: review", failed.requests[0].prompt_text)
         self.assertIn("Warning: stage1", stderr.getvalue())
 
     async def test_stage_timeout_is_enforced_for_uncooperative_adapter(self):

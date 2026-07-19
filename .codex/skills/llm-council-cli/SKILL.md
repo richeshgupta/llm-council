@@ -24,13 +24,13 @@ Reuse an existing `.venv` when present.
 Run a passive check first:
 
 ```bash
-llm-council --doctor
+llm-council doctor
 ```
 
 If binaries are present but a real run fails, verify authentication and model access:
 
 ```bash
-llm-council --doctor --probe
+llm-council doctor --probe
 ```
 
 Warn the user that `--probe` sends a minimal request and may consume subscription usage.
@@ -40,25 +40,25 @@ Warn the user that `--probe` sends a minimal request and may consume subscriptio
 Full answers, critiques, rankings, and synthesis:
 
 ```bash
-llm-council "Explain Docker in 3 bullet points."
+llm-council ask --mode general "Explain Docker in 3 bullet points."
 ```
 
 Final answer only:
 
 ```bash
-llm-council --output final "What is 2 + 2?"
+llm-council ask --mode general --output final "What is 2 + 2?"
 ```
 
 Machine-readable result:
 
 ```bash
-llm-council --output json "Review this design" > result.json
+llm-council ask --mode review --output json "Review this design" > result.json
 ```
 
 Piped request:
 
 ```bash
-printf '%s\n' "Summarize HTTP in one paragraph" | llm-council --output final
+printf '%s\n' "Summarize HTTP in one paragraph" | llm-council ask --output final
 ```
 
 ## Configure advisors
@@ -80,7 +80,7 @@ Keep each provider adapter in `backend/advisors/adapters/`. Implement the `Advis
 ## Troubleshoot
 
 - Exit `2`: inspect configuration syntax and validation output.
-- Exit `1`: read provider diagnostics on stderr, then run `--doctor --probe`.
+- Exit `1`: read provider diagnostics on stderr, then run `doctor --probe`.
 - Missing command: install the relevant provider CLI and ensure it is on `PATH`.
 - Authentication failure: log in through that provider's CLI and rerun the probe.
 - Model unavailable: update the advisor's `model` in the selected config.
