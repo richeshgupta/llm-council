@@ -32,6 +32,7 @@ class AdvisorStatus(str, Enum):
     FAILED = "failed"
     TIMEOUT = "timeout"
     SKIPPED = "skipped"
+    DEGRADED = "degraded"
 
 
 class AdvisorMessage(BaseModel):
@@ -109,3 +110,11 @@ class Advisor(ABC):
             message="No explicit health check implemented",
         )
 
+
+def render_cli_prompt(request: AdvisorRequest) -> str:
+    """Render chat messages into one prompt for text-only CLI providers."""
+    if request.messages:
+        return "\n\n".join(
+            f"<{message.role.upper()}>\n{message.content}" for message in request.messages
+        )
+    return request.prompt_text or ""

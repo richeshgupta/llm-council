@@ -4,7 +4,15 @@ from __future__ import annotations
 
 import shutil
 
-from ..base import Advisor, AdvisorHealth, AdvisorMode, AdvisorRequest, AdvisorResponse, AdvisorStatus
+from ..base import (
+    Advisor,
+    AdvisorHealth,
+    AdvisorMode,
+    AdvisorRequest,
+    AdvisorResponse,
+    AdvisorStatus,
+    render_cli_prompt,
+)
 from ..config import AdvisorConfig
 from ..subprocess_runner import run_subprocess
 
@@ -16,6 +24,8 @@ class ClaudeCliAdvisor(Advisor):
     supports_streaming = False
 
     def __init__(self, config: AdvisorConfig):
+        if config.options:
+            raise ValueError(f"Unknown Claude options: {', '.join(sorted(config.options))}")
         self.config = config
         self.id = config.id
         self.display_name = config.display_name
@@ -31,7 +41,7 @@ class ClaudeCliAdvisor(Advisor):
             args.extend(["--model", self.model])
         args.extend(["--tools", ""])
 
-        prompt = request.prompt_text or "\n\n".join(m.content for m in request.messages)
+        prompt = render_cli_prompt(request)
         try:
             result = await run_subprocess(
                 args=args,
@@ -46,6 +56,8 @@ class ClaudeCliAdvisor(Advisor):
         if result.exit_code != 0:
             raw_error = result.stderr or result.stdout
             return self._failed(self._classify_error(raw_error), "Claude CLI failed", raw_error, result.latency_ms)
+        if not result.stdout.strip():
+            return self._failed("empty_response", "Claude CLI returned an empty response", result.stderr, result.latency_ms)
 
         return AdvisorResponse(
             advisor_id=self.id,
@@ -71,7 +83,11 @@ class ClaudeCliAdvisor(Advisor):
             authenticated=None,
             model_available=None,
             healthy=installed,
-            message=None if installed else f"Command not found: {self.command}",
+            message=(
+                "command installed; authentication/model not probed"
+                if installed
+                else f"Command not found: {self.command}"
+            ),
         )
 
     def _classify_error(self, stderr: str) -> str:

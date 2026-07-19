@@ -7,8 +7,9 @@ This repository is terminal-only. Do not add or start a web frontend unless the 
 Install:
 
 ```bash
-/home/richesh/.local/bin/python3.11 -m venv .venv
-.venv/bin/python -m pip install -e .
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
 ```
 
 Ask a query:
@@ -36,7 +37,7 @@ EOF
 Codex Terra:
 
 ```bash
-codex exec --sandbox read-only --cd /home/richesh/Desktop/projects/llm-council --model gpt-5.6-terra - <<'EOF'
+codex exec --sandbox read-only --cd "$PWD" --model gpt-5.6-terra - <<'EOF'
 Return exactly: TERRA_OK
 EOF
 ```
@@ -91,9 +92,8 @@ Run a real query:
 
 ## Common gotchas
 
-- Run commands from the repository root.
+- Installation and tests run from the repository root; the installed CLI can run from any directory.
 - If `llm-council` is missing, rerun `.venv/bin/python -m pip install -e .`.
 - If Claude fails, run the Claude smoke check first.
 - If Codex fails, run the Codex Terra smoke check first.
 - If Stage 1 is empty, every enabled advisor failed; test advisors one by one.
-

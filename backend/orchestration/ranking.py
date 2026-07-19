@@ -8,17 +8,15 @@ from typing import Any
 
 
 def parse_ranking_from_text(ranking_text: str) -> list[str]:
-    """Parse the FINAL RANKING section from a model response."""
-    if "FINAL RANKING:" in ranking_text:
-        parts = ranking_text.split("FINAL RANKING:")
-        if len(parts) >= 2:
-            ranking_section = parts[1]
-            numbered_matches = re.findall(r"\d+\.\s*Response [A-Z]", ranking_section)
-            if numbered_matches:
-                return [re.search(r"Response [A-Z]", match).group() for match in numbered_matches]
-            return re.findall(r"Response [A-Z]", ranking_section)
-
-    return re.findall(r"Response [A-Z]", ranking_text)
+    """Parse only numbered entries from an explicit FINAL RANKING section."""
+    match = re.search(r"FINAL\s+RANKING\s*:\s*(.*)", ranking_text, re.IGNORECASE | re.DOTALL)
+    if not match:
+        return []
+    return re.findall(
+        r"^\s*\d+\.\s*(Response\s+[A-Z]+)\s*$",
+        match.group(1),
+        re.IGNORECASE | re.MULTILINE,
+    )
 
 
 def calculate_aggregate_rankings(
@@ -27,10 +25,14 @@ def calculate_aggregate_rankings(
 ) -> list[dict[str, Any]]:
     """Calculate average rank by model from parsed peer rankings."""
     model_positions = defaultdict(list)
+    expected_labels = set(label_to_model)
 
     for ranking in stage2_results:
         parsed_ranking = ranking.get("parsed_ranking") or parse_ranking_from_text(ranking.get("ranking", ""))
-        for position, label in enumerate(parsed_ranking, start=1):
+        normalized = [f"Response {label.split()[-1].upper()}" for label in parsed_ranking]
+        if len(normalized) != len(expected_labels) or set(normalized) != expected_labels:
+            continue
+        for position, label in enumerate(normalized, start=1):
             if label in label_to_model:
                 model_positions[label_to_model[label]].append(position)
 
@@ -45,6 +47,5 @@ def calculate_aggregate_rankings(
                 }
             )
 
-    aggregate.sort(key=lambda item: item["average_rank"])
+    aggregate.sort(key=lambda item: (item["average_rank"], item["model"]))
     return aggregate
-

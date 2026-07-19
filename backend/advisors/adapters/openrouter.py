@@ -27,6 +27,8 @@ class OpenRouterAdvisor(Advisor):
     supports_streaming = False
 
     def __init__(self, config: AdvisorConfig):
+        if config.options:
+            raise ValueError(f"Unknown OpenRouter options: {', '.join(sorted(config.options))}")
         self.config = config
         self.id = config.id
         self.display_name = config.display_name
@@ -73,6 +75,14 @@ class OpenRouterAdvisor(Advisor):
                 raw_error=exc.response.text,
                 started=started,
             )
+        except httpx.TimeoutException as exc:
+            return self._failed(
+                "timeout",
+                "OpenRouter request timed out",
+                raw_error=str(exc),
+                started=started,
+                status=AdvisorStatus.TIMEOUT,
+            )
         except Exception as exc:
             return self._failed(
                 "request_failed",
@@ -81,15 +91,30 @@ class OpenRouterAdvisor(Advisor):
                 started=started,
             )
 
-        message = data["choices"][0]["message"]
+        try:
+            message = data["choices"][0]["message"]
+            content = message.get("content") or ""
+        except (KeyError, IndexError, TypeError, AttributeError) as exc:
+            return self._failed(
+                "invalid_response",
+                "OpenRouter returned an invalid response payload",
+                raw_error=str(exc),
+                started=started,
+            )
+        if not content.strip():
+            return self._failed(
+                "empty_response",
+                "OpenRouter returned an empty response",
+                started=started,
+            )
         return AdvisorResponse(
             advisor_id=self.id,
             display_name=self.display_name,
             provider=self.provider,
             mode=self.mode,
             status=AdvisorStatus.SUCCESS,
-            content=message.get("content") or "",
-            raw_output=message.get("content") or "",
+            content=content,
+            raw_output=content,
             latency_ms=int((time.monotonic() - started) * 1000),
             metadata={
                 "model": self.model,
@@ -116,6 +141,7 @@ class OpenRouterAdvisor(Advisor):
         user_message: str,
         raw_error: str | None = None,
         started: float | None = None,
+        status: AdvisorStatus = AdvisorStatus.FAILED,
     ) -> AdvisorResponse:
         latency_ms = int((time.monotonic() - started) * 1000) if started else None
         return AdvisorResponse(
@@ -123,7 +149,7 @@ class OpenRouterAdvisor(Advisor):
             display_name=self.display_name,
             provider=self.provider,
             mode=self.mode,
-            status=AdvisorStatus.FAILED,
+            status=status,
             content=None,
             raw_error=raw_error,
             error_type=error_type,
@@ -131,4 +157,3 @@ class OpenRouterAdvisor(Advisor):
             latency_ms=latency_ms,
             metadata={"model": self.model},
         )
-

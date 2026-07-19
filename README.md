@@ -1,108 +1,119 @@
 # LLM Council CLI
 
-Terminal-only LLM Council that asks multiple local/provider advisors for independent answers, collects peer review, and synthesizes a final response.
+LLM Council is a terminal-first brainstorming tool for developers. It asks several independently configured LLM advisors for answers, has them anonymously critique and rank the candidate answers, then asks a chairman model to synthesize the council's best result.
 
-Default providers:
+It supports local subscription-backed CLIs such as Codex and Claude Code, plus API-backed providers through adapters. No frontend is required.
 
-- Codex GPT-5.6 Terra through local `codex exec`
-- Claude Sonnet through local `claude -p`
-- OpenRouter adapter available but disabled by default
+## How it works
+
+1. **Independent answers** — every enabled council member answers the same request in parallel.
+2. **Anonymous peer review** — members evaluate responses labeled `Response A`, `Response B`, and so on.
+3. **Synthesis** — the configured chairman uses the answers, critiques, and valid aggregate rankings to produce one final answer.
+
+Provider failures are isolated. Partial failures are reported on stderr, chairman candidates fail over in configured order, and a run exits nonzero if it cannot produce a synthesized answer.
 
 ## Install
 
-```bash
-cd /home/richesh/Desktop/projects/llm-council
-/home/richesh/.local/bin/python3.11 -m venv .venv
-.venv/bin/python -m pip install -e .
-```
-
-## Verify providers
-
-Claude:
+Prerequisites: Python 3.10+, plus authenticated `codex` and/or `claude` commands for the default configuration.
 
 ```bash
-claude -p - --output-format text --no-session-persistence --tools '' <<'EOF'
-Return exactly: CLAUDE_OK
-EOF
+git clone https://github.com/richeshgupta/llm-council.git
+cd llm-council
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
 ```
 
-Codex Terra:
+Verify the local setup without consuming model usage:
 
 ```bash
-codex exec --sandbox read-only --cd /home/richesh/Desktop/projects/llm-council --model gpt-5.6-terra - <<'EOF'
-Return exactly: TERRA_OK
-EOF
+llm-council --doctor
 ```
 
-## Ask a query
+Verify authentication and model access with a minimal real request to every enabled provider:
 
 ```bash
-.venv/bin/python scripts/ask_council.py "Explain Docker in 3 bullet points."
+llm-council --doctor --probe
 ```
+
+`--probe` may count against provider subscription usage.
+
+## Ask the council
+
+```bash
+llm-council "Propose three architectures for a webhook delivery system and compare them."
+```
+
+The default output includes independent answers, full peer critiques, aggregate rankings, and final synthesis. Progress and provider warnings go to stderr, keeping stdout usable in pipelines.
 
 Final answer only:
 
 ```bash
-.venv/bin/python scripts/ask_council.py --brief "What is 2 + 2?"
+llm-council --output final "What are the tradeoffs between REST and gRPC here?"
 ```
 
-Pipe input:
+Structured output:
 
 ```bash
-echo "Summarize HTTP in one paragraph." | .venv/bin/python scripts/ask_council.py
+llm-council --output json "Review this migration plan" > council-result.json
 ```
+
+Pipe a request:
+
+```bash
+printf '%s\n' "Brainstorm ways to reduce CI time" | llm-council --output final
+```
+
+The compatibility forms `--brief`, `scripts/ask_council.py`, and `./start.sh` remain available.
 
 ## Configuration
 
-Edit:
+The shipped configuration enables:
 
-```text
-backend/advisors.json
-```
+- Codex GPT-5.6 Terra as council member, chairman, and title generator.
+- Claude Sonnet through Claude Code as a council member.
+- OpenRouter support, disabled by default.
 
-Current defaults:
+Configuration precedence is:
 
-- `codex-terra-cli`: enabled, council member, chairman, title generator
-- `claude-sonnet-cli`: enabled, council member
-- `openrouter-gemini`: disabled
+1. `--config /path/to/advisors.json`
+2. `LLM_COUNCIL_CONFIG`
+3. The packaged `backend/advisors.json`
 
-## Optional API server
+The same packaged configuration is used from any working directory. A missing explicit configuration is an error; the CLI never silently switches provider families.
 
-The CLI is the primary interface. The FastAPI server remains available for programmatic use:
+Codex runs in an isolated temporary directory by default and receives only essential CLI/auth/network environment variables. To intentionally give it read access to a repository, set `options.cwd` on that advisor explicitly.
 
-```bash
-.venv/bin/python -m backend.main
-```
+Use [backend/advisors.json.example](backend/advisors.json.example) as a starting point. New providers implement the `Advisor` interface in `backend/advisors/base.py`, live in their own adapter module under `backend/advisors/adapters/`, and register a factory with `AdvisorRegistry.register_provider()`.
 
-Useful endpoints:
+## Exit behavior
 
-```text
-GET /api/advisors
-GET /api/advisors/health
-POST /api/conversations
-POST /api/conversations/{conversation_id}/message
-```
+- `0`: synthesis succeeded, including runs with non-fatal advisor failures.
+- `1`: providers were unavailable or synthesis could not complete.
+- `2`: command usage or configuration error.
+- `130`: interrupted by the user.
 
-## Tests
+## Optional local API
+
+The CLI is the primary interface. A local-only FastAPI server is available for programmatic integrations:
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -p 'test*.py' -v
+python -m backend.main
 ```
 
-## Skill
+It binds to `127.0.0.1:8001` by default. Conversation data is stored under the platform data directory, configurable with `LLM_COUNCIL_DATA_DIR`.
 
-Repo-local Codex skill:
+## Test
 
-```text
-.codex/skills/llm-council-cli/SKILL.md
+```bash
+python -m unittest discover -s tests -p 'test*.py' -v
 ```
 
-Use it when asking Codex to install, configure, smoke-test, or run this project from terminal.
+Real-provider checks are intentionally separate because they consume subscription usage:
 
-## Validation
-
-See:
-
-```text
-docs/CLI_VALIDATION_REPORT.md
+```bash
+llm-council --doctor --probe
+llm-council --output final "Reply with exactly COUNCIL_OK"
 ```
+
+See [docs/CLI_VALIDATION_REPORT.md](docs/CLI_VALIDATION_REPORT.md) for the latest validation results.

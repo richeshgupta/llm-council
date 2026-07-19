@@ -1,81 +1,96 @@
 # CLI Validation Report
 
-This repository is terminal-only. The frontend has been removed.
+Date: 2026-07-19
 
-## Primary command paths
+## Result
 
-Install:
+The CLI-only LLM Council passed automated, packaging, failure-path, and authenticated-provider validation.
 
-```bash
-/home/richesh/.local/bin/python3.11 -m venv .venv
-.venv/bin/python -m pip install -e .
-```
+## Automated suite
 
-Run query:
-
-```bash
-.venv/bin/llm-council "Explain Docker in 3 bullet points."
-```
-
-Compatibility wrapper:
-
-```bash
-.venv/bin/python scripts/ask_council.py "Explain Docker in 3 bullet points."
-```
-
-## Provider smoke checks
-
-Claude:
-
-```bash
-claude -p - --output-format text --no-session-persistence --tools '' <<'EOF'
-Return exactly: CLAUDE_OK
-EOF
-```
-
-Codex Terra:
-
-```bash
-codex exec --sandbox read-only --cd /home/richesh/Desktop/projects/llm-council --model gpt-5.6-terra - <<'EOF'
-Return exactly: TERRA_OK
-EOF
-```
-
-## Automated tests
+Command:
 
 ```bash
 .venv/bin/python -m unittest discover -s tests -p 'test*.py' -v
 ```
 
-Latest local result:
+Result: **27 tests passed**.
 
-```text
-Ran 8 tests
-OK
-```
+Covered scenarios include:
 
-## Real query smoke tests
+- Three-stage happy-path handoff.
+- Provider exception isolation.
+- Partial and all-provider failure metadata.
+- Chairman failover.
+- Orchestration-level timeout enforcement.
+- Shared concurrency limits across simultaneous runs.
+- Subprocess success and timeout cleanup.
+- Configuration loading outside the repository root.
+- Missing config, duplicate advisor IDs, and invalid concurrency.
+- Provider/config mode mismatch validation.
+- Complete CLI role rendering for system/user messages.
+- Strict ranking parsing and malformed ballot rejection.
+- Anonymous labels beyond 26 candidates.
+- JSON output and nonzero failure exit status.
+- API health, deterministic advisor metadata, empty-body conversation creation, input validation, follow-up context, and streaming aggregate parity.
 
-Installed console command:
+The FastAPI tests emit a non-failing upstream Starlette/httpx deprecation warning.
+
+## Packaging
+
+A wheel was built, installed into a clean Python 3.11 environment, and invoked from `/tmp`.
+
+Verified:
+
+- `backend/advisors.json` and `backend/advisors.json.example` are present in the wheel.
+- Running outside the checkout loads `codex_cli` and `claude_cli`.
+- The CLI does not silently switch to OpenRouter.
+- `llm-council --doctor` resolves the packaged configuration and finds both local commands.
+
+## Provider authentication
+
+Command:
 
 ```bash
-.venv/bin/llm-council --brief "Answer in one short sentence: what is 2 + 2?"
+.venv/bin/llm-council --doctor --probe
 ```
 
 Result:
 
-```text
-2 + 2 = 4.
-```
+- Codex GPT-5.6 Terra: `LLM_COUNCIL_OK`
+- Claude Sonnet via Claude Code: `LLM_COUNCIL_OK`
+- Exit status: `0`
 
-Compatibility wrapper:
+## Real council flow
 
-```bash
-.venv/bin/python scripts/ask_council.py --brief "Answer in one short sentence: what is the capital of France?"
-```
+A real architecture-brainstorming query ran through all stages with JSON output.
 
-Result:
+- Run ID: `9260ab28-06f6-418b-b641-b1d94cae3995`
+- Stage 1: 2/2 advisor answers.
+- Stage 2: 2/2 peer reviews with complete ballots.
+- Aggregate ranking: 2 candidates, 2 votes each.
+- Stage 3: Codex chairman synthesis succeeded.
+- Provider failures: none.
+- Exit status: `0`.
 
-```text
-Paris.
-```
+An additional piped-stdin compatibility run returned exactly `COUNCIL_STDIN_OK` through `--brief` with exit status `0`.
+
+## Failure semantics
+
+Using a temporary configuration whose Claude and Codex command names did not exist:
+
+- Both provider-specific errors were printed to stderr.
+- The final status was failed.
+- Exit status was `1`.
+
+Using a missing explicit config:
+
+- A concise configuration error was printed to stderr.
+- Exit status was `2`.
+
+## Other checks
+
+- `compileall`: passed.
+- `pip check`: passed.
+- `git diff --check`: passed.
+- Repo-local Codex skill validation: passed.

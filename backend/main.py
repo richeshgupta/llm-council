@@ -2,17 +2,39 @@
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, field_validator
 from typing import List, Dict, Any
 import uuid
 import json
 import asyncio
+from contextlib import suppress
 
 from . import storage
 from .council import run_full_council, generate_conversation_title, stage1_collect_responses, stage2_collect_rankings, stage3_synthesize_final, calculate_aggregate_rankings
 from .advisors.registry import AdvisorRegistry
 
 app = FastAPI(title="LLM Council API")
+
+
+def build_contextual_query(conversation: Dict[str, Any], current_content: str) -> str:
+    """Include recent conversation turns when refining an existing brainstorm."""
+    history = []
+    for message in conversation.get("messages", [])[-20:]:
+        if message.get("role") == "user":
+            history.append(f"User: {message.get('content', '')}")
+        elif message.get("role") == "assistant":
+            answer = message.get("stage3", {}).get("response", "")
+            if answer:
+                history.append(f"Council: {answer}")
+    if not history:
+        return current_content
+    context = "\n\n".join(history)
+    if len(context) > 80_000:
+        context = context[-80_000:]
+    return (
+        "Use the prior conversation as context and answer the current request.\n\n"
+        f"PRIOR CONVERSATION:\n{context}\n\nCURRENT REQUEST:\n{current_content}"
+    )
 
 
 class CreateConversationRequest(BaseModel):
@@ -22,7 +44,14 @@ class CreateConversationRequest(BaseModel):
 
 class SendMessageRequest(BaseModel):
     """Request to send a message in a conversation."""
-    content: str
+    content: str = Field(min_length=1, max_length=100_000)
+
+    @field_validator("content")
+    @classmethod
+    def content_must_not_be_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("content must not be blank")
+        return value
 
 
 class ConversationMetadata(BaseModel):
@@ -57,7 +86,7 @@ async def list_advisors():
             "display_name": advisor.display_name,
             "provider": advisor.provider,
             "mode": advisor.mode.value,
-            "roles": [role.value for role in advisor.roles],
+            "roles": sorted(role.value for role in advisor.roles),
             "supports_streaming": advisor.supports_streaming,
         }
         for advisor in registry.get_enabled_advisors()
@@ -81,7 +110,7 @@ async def list_conversations():
 
 
 @app.post("/api/conversations", response_model=Conversation)
-async def create_conversation(request: CreateConversationRequest):
+async def create_conversation(request: CreateConversationRequest | None = None):
     """Create a new conversation."""
     conversation_id = str(uuid.uuid4())
     conversation = storage.create_conversation(conversation_id)
@@ -110,6 +139,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
+    council_query = build_contextual_query(conversation, request.content)
 
     # Add user message
     storage.add_user_message(conversation_id, request.content)
@@ -121,7 +151,7 @@ async def send_message(conversation_id: str, request: SendMessageRequest):
 
     # Run the 3-stage council process
     stage1_results, stage2_results, stage3_result, metadata = await run_full_council(
-        request.content
+        council_query
     )
 
     # Add assistant message with all stages
@@ -154,31 +184,56 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
     # Check if this is the first message
     is_first_message = len(conversation["messages"]) == 0
+    council_query = build_contextual_query(conversation, request.content)
 
     async def event_generator():
+        title_task = None
         try:
             # Add user message
             storage.add_user_message(conversation_id, request.content)
 
             # Start title generation in parallel (don't await yet)
-            title_task = None
             if is_first_message:
                 title_task = asyncio.create_task(generate_conversation_title(request.content))
 
             # Stage 1: Collect responses
             yield f"data: {json.dumps({'type': 'stage1_start'})}\n\n"
-            stage1_results = await stage1_collect_responses(request.content)
+            stage1_results = await stage1_collect_responses(council_query)
             yield f"data: {json.dumps({'type': 'stage1_complete', 'data': stage1_results})}\n\n"
+
+            if not stage1_results:
+                if title_task:
+                    title_task.cancel()
+                    with suppress(asyncio.CancelledError):
+                        await title_task
+                storage.add_assistant_message(
+                    conversation_id,
+                    [],
+                    [],
+                    {
+                        "model": "error",
+                        "response": "All advisors failed to respond.",
+                        "status": "failed",
+                        "error_type": "all_advisors_failed",
+                    },
+                )
+                yield f"data: {json.dumps({'type': 'error', 'message': 'All advisors failed to respond.'})}\n\n"
+                return
 
             # Stage 2: Collect rankings
             yield f"data: {json.dumps({'type': 'stage2_start'})}\n\n"
-            stage2_results, label_to_model = await stage2_collect_rankings(request.content, stage1_results)
+            stage2_results, label_to_model = await stage2_collect_rankings(council_query, stage1_results)
             aggregate_rankings = calculate_aggregate_rankings(stage2_results, label_to_model)
             yield f"data: {json.dumps({'type': 'stage2_complete', 'data': stage2_results, 'metadata': {'label_to_model': label_to_model, 'aggregate_rankings': aggregate_rankings}})}\n\n"
 
             # Stage 3: Synthesize final answer
             yield f"data: {json.dumps({'type': 'stage3_start'})}\n\n"
-            stage3_result = await stage3_synthesize_final(request.content, stage1_results, stage2_results)
+            stage3_result = await stage3_synthesize_final(
+                council_query,
+                stage1_results,
+                stage2_results,
+                aggregate_rankings,
+            )
             yield f"data: {json.dumps({'type': 'stage3_complete', 'data': stage3_result})}\n\n"
 
             # Wait for title generation if it was started
@@ -199,6 +254,10 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
             yield f"data: {json.dumps({'type': 'complete'})}\n\n"
 
         except Exception as e:
+            if title_task and not title_task.done():
+                title_task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await title_task
             # Send error event
             yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
@@ -214,4 +273,4 @@ async def send_message_stream(conversation_id: str, request: SendMessageRequest)
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="127.0.0.1", port=8001)

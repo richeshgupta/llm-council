@@ -11,13 +11,12 @@
       "provider": "codex_cli",
       "mode": "cli",
       "enabled": false,
-      "roles": ["council_member", "chairman"],
+      "roles": ["council_member", "chairman", "title_generator"],
       "command": "codex",
       "model": "gpt-5.6-terra",
       "timeout_seconds": 240,
       "options": {
-        "sandbox": "read-only",
-        "approval_policy": "never"
+        "sandbox": "read-only"
       }
     },
     {
@@ -37,7 +36,7 @@
       "provider": "openrouter",
       "mode": "api",
       "enabled": true,
-      "roles": ["council_member", "chairman"],
+      "roles": ["council_member", "chairman", "title_generator"],
       "model": "google/gemini-3-pro-preview",
       "env_api_key": "OPENROUTER_API_KEY"
     }

@@ -23,12 +23,14 @@ async def stage3_synthesize_final(
     user_query: str,
     stage1_results: list[dict[str, Any]],
     stage2_results: list[dict[str, Any]],
+    aggregate_rankings: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Stage 3: synthesize final response through the configured chairman advisor."""
     return await get_default_orchestrator().stage3_synthesize_final(
         user_query,
         stage1_results,
         stage2_results,
+        aggregate_rankings,
     )
 
 
@@ -40,4 +42,3 @@ async def generate_conversation_title(user_query: str) -> str:
 async def run_full_council(user_query: str) -> tuple[list, list, dict, dict]:
     """Run the complete 3-stage council process."""
     return await get_default_orchestrator().run_full_council(user_query)
-

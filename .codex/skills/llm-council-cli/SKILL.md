@@ -1,89 +1,94 @@
 ---
 name: llm-council-cli
-description: Install, configure, smoke-test, and run this repository's terminal-only LLM Council. Use when the user asks how to install the LLM Council CLI, run a query from the command line, verify Claude/Codex local subscription-backed providers, configure advisors, troubleshoot CLI execution, or avoid/remove the web frontend.
+description: Install, configure, diagnose, test, and run this repository's terminal-only LLM Council with local Claude/Codex subscriptions or provider adapters. Use for CLI setup, council queries, provider health checks, advisor configuration, structured output, and troubleshooting. No frontend is required.
 ---
 
 # LLM Council CLI
 
-Use this skill for this repository’s terminal-only workflow. Do not require or start the frontend.
+Use this skill for the repository's terminal-only workflow. Do not start or require a frontend.
 
 ## Install
 
-From the repo root:
+From the repository root:
 
 ```bash
-cd /home/richesh/Desktop/projects/llm-council
-/home/richesh/.local/bin/python3.11 -m venv .venv
-.venv/bin/python -m pip install -e .
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install -e .
 ```
 
-If `.venv` already exists, reuse it.
+Reuse an existing `.venv` when present.
 
-## Provider smoke checks
+## Diagnose providers
 
-Run these before debugging the council.
-
-Claude:
+Run a passive check first:
 
 ```bash
-claude -p - --output-format text --no-session-persistence --tools '' <<'EOF'
-Return exactly: CLAUDE_OK
-EOF
+llm-council --doctor
 ```
 
-Codex Terra:
+If binaries are present but a real run fails, verify authentication and model access:
 
 ```bash
-codex exec --sandbox read-only --cd /home/richesh/Desktop/projects/llm-council --model gpt-5.6-terra - <<'EOF'
-Return exactly: TERRA_OK
-EOF
+llm-council --doctor --probe
 ```
 
-Expected outputs are `CLAUDE_OK` and `TERRA_OK`.
+Warn the user that `--probe` sends a minimal request and may consume subscription usage.
 
 ## Run a council query
 
-Prefer the checked-in helper script:
+Full answers, critiques, rankings, and synthesis:
 
 ```bash
-.venv/bin/python scripts/ask_council.py "Explain Docker in 3 bullet points."
+llm-council "Explain Docker in 3 bullet points."
 ```
 
-Or use the installed console command after `pip install -e .`:
+Final answer only:
 
 ```bash
-.venv/bin/llm-council "Explain Docker in 3 bullet points."
+llm-council --output final "What is 2 + 2?"
 ```
 
-For final answer only:
+Machine-readable result:
 
 ```bash
-.venv/bin/llm-council --brief "What is 2 + 2?"
+llm-council --output json "Review this design" > result.json
 ```
 
-Pipe input:
+Piped request:
 
 ```bash
-echo "Summarize HTTP in one paragraph." | .venv/bin/python scripts/ask_council.py
+printf '%s\n' "Summarize HTTP in one paragraph" | llm-council --output final
 ```
 
-## Config
+## Configure advisors
 
-Advisor config is `backend/advisors.json`.
+The packaged default is `backend/advisors.json`. Override it with either:
 
-Default intent:
+```bash
+llm-council --config /path/to/advisors.json "Your question"
+```
 
-- `codex-terra-cli`: enabled, council member, chairman, title generator.
-- `claude-sonnet-cli`: enabled, council member.
-- `openrouter-gemini`: disabled.
+or:
 
-Use API providers only if explicitly enabled and credentials are configured.
+```bash
+export LLM_COUNCIL_CONFIG=/path/to/advisors.json
+```
 
-## Troubleshooting
+Keep each provider adapter in `backend/advisors/adapters/`. Implement the `Advisor` interface and register its factory with `AdvisorRegistry.register_provider()`.
 
-- `ModuleNotFoundError`: run `.venv/bin/python -m pip install -e .`.
-- `claude` not found: install Claude Code and ensure it is on `PATH`.
-- `codex` not found: install Codex CLI and ensure it is on `PATH`.
-- Claude login failure: run Claude authentication, then rerun the smoke check.
-- Codex model failure: run the direct Codex Terra smoke command; if the model slug is rejected, adjust `backend/advisors.json`.
-- Empty Stage 1: all enabled advisors failed; test each provider directly first.
+## Troubleshoot
+
+- Exit `2`: inspect configuration syntax and validation output.
+- Exit `1`: read provider diagnostics on stderr, then run `--doctor --probe`.
+- Missing command: install the relevant provider CLI and ensure it is on `PATH`.
+- Authentication failure: log in through that provider's CLI and rerun the probe.
+- Model unavailable: update the advisor's `model` in the selected config.
+- Partial failure: successful providers still complete the council; warnings identify degraded stages.
+
+## Validate changes
+
+```bash
+python -m unittest discover -s tests -p 'test*.py' -v
+python -m compileall -q backend tests scripts
+```
