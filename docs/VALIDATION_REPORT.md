@@ -67,13 +67,13 @@ Claude CLI is installed:
 2.1.195 (Claude Code)
 ```
 
-Current state:
+Current state after re-test:
 
 ```text
-Not logged in
+CLAUDE_OK
 ```
 
-The adapter handles this as a provider failure/skipped advisor scenario. The council continues when at least one advisor succeeds.
+The direct CLI smoke and adapter smoke both passed after local Claude authentication was completed.
 
 ## Live full-council smoke
 
@@ -104,6 +104,43 @@ Result summary:
   "stage3_response": "2 + 2 = 4.",
   "metadata_keys": ["aggregate_rankings", "label_to_model"],
   "title": "Simple Addition Answer"
+}
+```
+
+## Live full-council smoke with Codex Terra and Claude
+
+Prompt:
+
+```text
+Answer in one short sentence: what is the capital of France?
+```
+
+Result summary:
+
+```json
+{
+  "stage1_count": 2,
+  "stage1_advisors": [
+    {
+      "advisor_id": "codex-terra-cli",
+      "model": "gpt-5.6-terra",
+      "provider": "codex_cli",
+      "status": "success",
+      "response": "Paris."
+    },
+    {
+      "advisor_id": "claude-sonnet-cli",
+      "model": "sonnet",
+      "provider": "claude_cli",
+      "status": "success",
+      "response": "Paris."
+    }
+  ],
+  "stage2_count": 2,
+  "stage3_model": "gpt-5.6-terra",
+  "stage3_status": "success",
+  "stage3_response": "Paris.",
+  "title": "France Capital"
 }
 ```
 
@@ -141,6 +178,56 @@ Result summary:
 }
 ```
 
+## Live API streaming multi-turn smoke with Codex Terra and Claude
+
+Executed through FastAPI `TestClient`:
+
+1. Created a conversation.
+2. Sent a streamed first prompt.
+3. Sent a streamed follow-up prompt in the same conversation.
+4. Re-loaded the saved conversation.
+
+Observed:
+
+```json
+{
+  "first_events_present": {
+    "stage1_start": true,
+    "stage1_complete": true,
+    "stage2_start": true,
+    "stage2_complete": true,
+    "stage3_start": true,
+    "stage3_complete": true,
+    "complete": true
+  },
+  "second_events_present": {
+    "stage1_start": true,
+    "stage1_complete": true,
+    "stage2_start": true,
+    "stage2_complete": true,
+    "stage3_start": true,
+    "stage3_complete": true,
+    "complete": true
+  },
+  "message_count": 4,
+  "roles": ["user", "assistant", "user", "assistant"],
+  "assistant_stage_counts": [
+    {
+      "stage1": 2,
+      "stage2": 2,
+      "has_stage3": true,
+      "stage3_response": "10 - 3 = 7."
+    },
+    {
+      "stage1": 2,
+      "stage2": 2,
+      "has_stage3": true,
+      "stage3_response": "6 × 7 = 42."
+    }
+  ]
+}
+```
+
 ## Final validation state
 
 The implementation is locally validated for:
@@ -148,7 +235,7 @@ The implementation is locally validated for:
 - provider-neutral advisor interface;
 - dedicated adapter directory;
 - Codex CLI subscription-backed advisor;
-- Claude CLI installed-but-unauthenticated failure path;
+- Claude CLI authenticated success path;
 - OpenRouter adapter compile/API shape;
 - bounded orchestrator handoff;
 - ranking and aggregation;
@@ -156,4 +243,3 @@ The implementation is locally validated for:
 - follow-up chat input availability;
 - API advisor metadata and health endpoints;
 - parity with the three-stage council workflow.
-
