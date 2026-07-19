@@ -1,4 +1,14 @@
-# LLM Council CLI
+<p align="center">
+  <img src="assets/llm-council-banner.png" alt="Six AI advisor nodes converging into one LLM Council synthesis" width="920">
+</p>
+
+<h1 align="center">LLM Council CLI</h1>
+
+<p align="center">
+  <a href="https://github.com/richeshgupta/llm-council/actions/workflows/ci.yml"><img src="https://github.com/richeshgupta/llm-council/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI status"></a>
+  <img src="https://img.shields.io/badge/python-3.10%2B-3776AB" alt="Python 3.10+">
+  <img src="https://img.shields.io/badge/interface-CLI-4B32C3" alt="CLI interface">
+</p>
 
 LLM Council is a terminal-first brainstorming tool for developers. It asks several independently configured LLM advisors for answers, has them anonymously critique and rank the candidate answers, then asks a chairman model to synthesize the council's best result.
 
@@ -122,6 +132,10 @@ It binds to `127.0.0.1:8001` by default. Conversation data is stored under the p
 ```bash
 python -m unittest discover -s tests -p 'test*.py' -v
 ```
+
+GitHub Actions runs the suite on Python 3.10–3.14, compiles the source, checks installed dependencies, builds both distributions, and smoke-tests the installed wheel from outside the checkout. Built distributions are retained as workflow artifacts for seven days.
+
+Authenticated Claude and Codex calls are deliberately excluded from hosted CI because they require local paid-subscription sessions.
 
 Real-provider checks are intentionally separate because they consume subscription usage:
 

@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PYTHONDONTWRITEBYTECODE: "1"
+
+jobs:
+  tests:
+    name: Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install --editable .
+
+      - name: Compile Python sources
+        run: python -m compileall -q backend tests
+
+      - name: Run test suite
+        run: python -m unittest discover -s tests -p 'test*.py' -v
+
+      - name: Check installed dependencies
+        run: python -m pip check
+
+      - name: Smoke-test CLI metadata commands
+        run: |
+          llm-council --help
+          llm-council modes
+          llm-council advisors
+          llm-council config validate
+
+  package:
+    name: Build and smoke-test wheel
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Verify packaged runtime files
+        run: |
+          python -m zipfile -l dist/*.whl | grep 'backend/advisors.json'
+          python -m zipfile -l dist/*.whl | grep 'backend/commands/ask.py'
+
+      - name: Install wheel in a clean environment
+        run: |
+          python -m venv /tmp/llm-council-wheel
+          /tmp/llm-council-wheel/bin/python -m pip install dist/*.whl
+
+      - name: Smoke-test installed wheel outside checkout
+        working-directory: /tmp
+        run: |
+          /tmp/llm-council-wheel/bin/llm-council modes
+          /tmp/llm-council-wheel/bin/llm-council advisors
+          /tmp/llm-council-wheel/bin/llm-council config validate
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: llm-council-distributions
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
