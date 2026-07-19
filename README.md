@@ -145,3 +145,7 @@ llm-council ask --output final "Reply with exactly COUNCIL_OK"
 ```
 
 See [docs/CLI_VALIDATION_REPORT.md](docs/CLI_VALIDATION_REPORT.md) for the latest validation results.
+
+## Credits
+
+This project is an independent implementation inspired by [Andrej Karpathy's original LLM Council](https://github.com/karpathy/llm-council) and its elegant multi-model deliberation pattern. Sincere thanks to Andrej for sharing the idea and implementation publicly—the original project made this work possible and gave the community a compelling foundation to explore.
